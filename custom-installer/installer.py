@@ -96,6 +96,37 @@ def check_health(port, timeout=90):
     raise RuntimeError("Custom backend failed to become healthy")
 
 
+def check_custom_build(studio_home, version):
+    token = desktop_session(studio_home)
+    request = urllib.request.Request("http://127.0.0.1:8888/api/project-tools/build", headers={"Authorization": "Bearer " + token})
+    with urllib.request.urlopen(request, timeout=10) as response:
+        if json.load(response).get("version") != version:
+            raise RuntimeError("The custom backend version could not be verified")
+
+
+def cleanup_build_source(manifest):
+    root_value = manifest.get("cleanupRoot")
+    if not root_value:
+        return []
+    root = Path(root_value).resolve()
+    allowed = (Path(os.environ["USERPROFILE"]) / "Documents" / "Codex").resolve()
+    if root == allowed or not root.is_relative_to(allowed):
+        raise RuntimeError("Build cleanup root is outside the authorized Codex workspace")
+    marker = root / "work" / ".custom-build-cleanup"
+    if not marker.exists() or marker.read_text().strip() != manifest.get("cleanupMarker"):
+        return []  # Already cleaned or this installer is being used on another machine.
+    removed = []
+    for name in ["npm-cache", "work"]:
+        target = root / name
+        resolved = target.resolve()
+        if resolved.parent != root or resolved != target or target.is_symlink():
+            raise RuntimeError("Build cleanup target failed the resolved-path check")
+        if target.exists():
+            shutil.rmtree(target)
+            removed.append(str(target))
+    return removed
+
+
 def table_counts(path):
     if not path.exists():
         return {}
@@ -175,7 +206,13 @@ def run_installer(payload, studio_home, desktop, *, test=False):
         if not test:
             subprocess.Popen([str(executable)], cwd=str(desktop))
             check_health(8888)
+            check_custom_build(studio_home, manifest["version"])
         result = {"status": "installed", "version": manifest["version"], "backup": str(backup), "preservedCounts": before}
+        if not test:
+            try:
+                result["removedBuildSource"] = cleanup_build_source(manifest)
+            except Exception as cleanup_error:
+                result["cleanupWarning"] = str(cleanup_error)
         log.write_text(json.dumps(result, indent=2), encoding="utf-8")
         (studio_home / "custom-build.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
         print(json.dumps(result, indent=2))

@@ -183,6 +183,22 @@ def test_goal_completion_is_read_from_durable_assistant_message(env):
     assert tools.goals("p")[0]["status"] == "completed"
 
 
+def test_goal_replays_headless_chunks_into_saved_history(env):
+    goal = tools.create_goal("p", tools.CreateGoal(objective="Work"), "unsloth")
+    asyncio.run(tools.tick_goal(goal, env.app, 0))
+    saved = tools.goals("p")[0]
+    run = runs.get_run(saved["run_id"])
+    with history.get_connection() as conn:
+        conn.execute("INSERT INTO chat_generation_events(run_id,seq,event_type,payload_json,created_at) VALUES (?,?,?,?,?)",
+                     (run["id"], 2, "chunk", json.dumps({"choices": [{"delta": {"content": "Verified. [GOAL_COMPLETE]"}}]}), 1))
+        conn.execute("UPDATE chat_generation_runs SET status='completed',last_event_seq=2 WHERE id=?", (run["id"],))
+        conn.execute("UPDATE chat_messages SET metadata_json=? WHERE id=?", (json.dumps({"generationRunId": run["id"], "generationSeq": 0, "generationStatus": "completed", "serverManaged": True}), run["assistantMessageId"]))
+    asyncio.run(tools.tick_goal(tools.goals("p")[0], env.app, 0))
+    assert tools.goals("p")[0]["status"] == "completed"
+    message = history.get_chat_message(goal["thread_id"], run["assistantMessageId"])
+    assert tools.message_text(message) == "Verified. [GOAL_COMPLETE]"
+
+
 def test_linked_folder_can_scan_more_than_ten_thousand_files(env):
     from core.rag import config, folder_sync
     root = env.tmp / "large-source"
