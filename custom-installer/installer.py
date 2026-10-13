@@ -32,7 +32,16 @@ def replace_file(source, target):
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(target.name + ".custom-new")
     shutil.copy2(source, temporary)
-    os.replace(temporary, target)
+    # Windows can retain an image/antivirus handle briefly after process exit.
+    deadline = time.monotonic() + 15
+    while True:
+        try:
+            os.replace(temporary, target)
+            return
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.5)
 
 
 def stop_exact_processes(paths):

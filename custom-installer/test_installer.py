@@ -17,6 +17,23 @@ spec.loader.exec_module(installer)
 
 
 class InstallerTests(unittest.TestCase):
+    def test_replacement_retries_transient_windows_file_lock(self):
+        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+            root = Path(directory)
+            source, target = root / "new.exe", root / "app.exe"
+            source.write_bytes(b"new")
+            target.write_bytes(b"old")
+            original_replace = installer.os.replace
+            attempts = []
+            def locked_replace(before, after):
+                attempts.append(1)
+                if len(attempts) < 3: raise PermissionError("Windows image handle still closing")
+                return original_replace(before, after)
+            with patch.object(installer.os, "replace", side_effect=locked_replace), patch.object(installer.time, "sleep"):
+                installer.replace_file(source, target)
+            self.assertEqual(target.read_bytes(), b"new")
+            self.assertEqual(len(attempts), 3)
+
     def test_health_uses_actual_unsloth_health_endpoint(self):
         import threading
         from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
