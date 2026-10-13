@@ -21,9 +21,9 @@ type GitState = { root: string; branch: string; files: { status: string; path: s
 type Goal = { id: string; objective: string; status: string; turns: number; max_turns: number; elapsed: number;
   max_seconds: number; thread_id: string; error: string | null };
 
-export function ProjectToolsPanel({ projectId }: { projectId: string }) {
+export function ProjectToolsPanel({ projectId, initialTab = "git", goalThreadId }: { projectId: string; initialTab?: "git" | "goals"; goalThreadId?: string }) {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"git" | "goals">("git");
+  const [tab, setTab] = useState<"git" | "goals">(initialTab);
   const [git, setGit] = useState<GitState | null>(null);
   const [gitError, setGitError] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
@@ -110,7 +110,8 @@ export function ProjectToolsPanel({ projectId }: { projectId: string }) {
         <label className="text-xs">Active time (minutes)<Input aria-label="Goal time limit" type="number" min={1} max={10080} value={minutes} onChange={e => setMinutes(Number(e.target.value))} /></label>
         <label className="text-xs">Output tokens per turn<Input aria-label="Goal token limit" type="number" min={64} max={131072} value={tokens} onChange={e => setTokens(Number(e.target.value))} /></label>
       </div>
-      <Button disabled={busy || !objective.trim() || turns < 1 || minutes < 1 || tokens < 64} onClick={() => void execute(`${prefix}/goals`, { objective, model, maxTurns: turns, maxSeconds: minutes*60, tokensPerTurn: tokens })}>Start persistent goal</Button>
+      {goalThreadId && <p className="text-xs text-muted-foreground">The goal continues in this project chat, using its saved conversation.</p>}
+      <Button disabled={busy || !objective.trim() || turns < 1 || minutes < 1 || tokens < 64} onClick={() => void execute(`${prefix}/goals`, { objective, model, maxTurns: turns, maxSeconds: minutes*60, tokensPerTurn: tokens, ...(goalThreadId ? { threadId: goalThreadId } : {}) })}>Start persistent goal</Button>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {goals.map(goal => <article key={goal.id} className="space-y-2 rounded-xl border border-border p-3">
         <p className="whitespace-pre-wrap text-sm">{goal.objective}</p>

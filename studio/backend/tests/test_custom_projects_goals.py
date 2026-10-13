@@ -113,6 +113,24 @@ def test_goals_preserve_saved_provider_reference_without_credentials(env):
     assert "provider_base_url" not in run["requestPayload"]
 
 
+def test_goal_can_continue_current_project_chat_without_replacing_history(env):
+    history.upsert_chat_thread({"id": "current", "title": "Keep title", "modelType": "model1", "modelId": "default", "projectId": "p", "createdAt": 1})
+    history.upsert_chat_message({"id": "prior", "threadId": "current", "role": "user", "createdAt": 1, "content": [{"type": "text", "text": "Existing work"}]})
+    goal = tools.create_goal("p", tools.CreateGoal(objective="Continue this work", threadId="current"), "unsloth")
+    asyncio.run(tools.tick_goal(goal, env.app, 0))
+    assert history.get_chat_thread("current")["title"] == "Keep title"
+    assert history.get_chat_message("current", "prior")
+    run = runs.get_run(tools.goals("p")[0]["run_id"])
+    assert run["threadId"] == "current"
+    assert any(m["content"] == "Existing work" for m in run["requestPayload"]["messages"])
+
+
+def test_goal_cannot_reuse_chat_in_another_project(env):
+    history.upsert_chat_thread({"id": "other", "title": "Other", "modelType": "model1", "modelId": "default", "createdAt": 1})
+    with pytest.raises(HTTPException):
+        tools.create_goal("p", tools.CreateGoal(objective="Work", threadId="other"), "unsloth")
+
+
 def test_research_steering_is_durable_and_retains_evidence(env):
     history.upsert_chat_thread({"id": "research-thread", "title": "Research", "modelType": "model1", "modelId": "default", "createdAt": 1})
     history.upsert_chat_message({"id": "question", "threadId": "research-thread", "role": "user", "createdAt": 1, "content": [{"type": "text", "text": "Question"}]})

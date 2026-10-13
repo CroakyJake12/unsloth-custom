@@ -17,6 +17,24 @@ spec.loader.exec_module(installer)
 
 
 class InstallerTests(unittest.TestCase):
+    def test_health_uses_actual_unsloth_health_endpoint(self):
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        class HealthServer(BaseHTTPRequestHandler):
+            def log_message(self, *args): pass
+            def do_GET(self):
+                self.send_response(200 if self.path == "/api/health" else 404)
+                self.end_headers()
+                self.wfile.write(b'{"status":"healthy"}')
+        server = ThreadingHTTPServer(("127.0.0.1", 0), HealthServer)
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            installer.check_health(server.server_address[1], timeout=3)
+        finally:
+            server.shutdown()
+            server.server_close()
+
     def fixture(self, root):
         studio, desktop, payload = root / "studio", root / "desktop", root / "payload"
         runtime = studio / "unsloth_studio/Lib/site-packages/studio/backend"

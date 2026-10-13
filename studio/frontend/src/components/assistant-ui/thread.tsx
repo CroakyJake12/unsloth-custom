@@ -190,6 +190,7 @@ import {
   useLibraryChatHandoffStore,
 } from "@/features/library/chat-handoff-store";
 import { resumesThought } from "@/features/model-picker";
+import { PersistentGoalDialog } from "@/features/chat/components/persistent-goal-dialog";
 import { projectToolsRequest } from "@/features/chat/components/project-tools-panel";
 import { cancelResearchRun } from "@/features/chat/api/research-api";
 import {
@@ -6796,6 +6797,7 @@ const ComposerToolsMenu: FC<{
   researchAvailable: boolean;
   audioUploadBusy: boolean;
 }> = ({ side = "bottom", researchAvailable, audioUploadBusy }) => {
+  const [persistentGoalOpen, setPersistentGoalOpen] = useState(false);
   const t = useT();
   const navigate = useNavigate();
   const toolsEnabled = useChatRuntimeStore((s) => s.toolsEnabled);
@@ -7170,6 +7172,7 @@ const ComposerToolsMenu: FC<{
 
   return (
     <>
+    <PersistentGoalDialog open={persistentGoalOpen} onOpenChange={setPersistentGoalOpen} />
     <ChatSkillsDialog open={skillsOpen} onOpenChange={setSkillsOpen} />
     <PromptStorageDialog
       open={promptStorageOpen}
@@ -7260,6 +7263,10 @@ const ComposerToolsMenu: FC<{
               className="ml-auto"
             />
           ) : null}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setPersistentGoalOpen(true)}>
+          <HugeiconsIcon icon={Telescope02Icon} strokeWidth={2} />
+          Persistent goal…
         </DropdownMenuItem>
         {researchAvailable ? (
           <DropdownMenuItem

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
+import { PersistentGoalDialog } from "./components/persistent-goal-dialog";
+import { Telescope02Icon } from "@hugeicons/core-free-icons";
 import {
   DEFAULT_ENGINE_LAUNCH_FIELDS,
   engineLaunchFieldsFrom,
@@ -680,6 +682,7 @@ export function SharedComposer({
   const [dragging, setDragging] = useState(false);
   const [isComposing, setIsComposing] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [persistentGoalOpen, setPersistentGoalOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [promptStorageOpen, setPromptStorageOpen] = useState(false);
   const [recentPrompts, setRecentPrompts] = useState<PromptEntry[]>([]);
@@ -2834,6 +2837,7 @@ export function SharedComposer({
               open={newProjectOpen}
               onOpenChange={setNewProjectOpen}
             />
+            <PersistentGoalDialog open={persistentGoalOpen} onOpenChange={setPersistentGoalOpen} />
             {/* Same + menu as single-chat (ComposerToolsMenu), wired to the compare composer's own file/audio
                 inputs and tools. */}
             <DropdownMenu
@@ -2858,6 +2862,10 @@ export function SharedComposer({
                 className="unsloth-plus-menu w-[calc(244px*var(--ui-space-scale,1))]"
                 onCloseAutoFocus={(event) => event.preventDefault()}
               >
+                <DropdownMenuItem onSelect={() => setPersistentGoalOpen(true)}>
+                  <HugeiconsIcon icon={Telescope02Icon} strokeWidth={2} />
+                  Persistent goal…
+                </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
                   <HugeiconsIcon icon={AttachmentIcon} strokeWidth={2} />
                   Add photos &amp; files

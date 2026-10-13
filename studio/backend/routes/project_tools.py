@@ -211,6 +211,7 @@ class CreateGoal(BaseModel):
     maxTurns: int = Field(default=50, ge=1, le=10000)
     maxSeconds: int = Field(default=3600, ge=10, le=604800)
     tokensPerTurn: int = Field(default=8192, ge=64, le=131072)
+    threadId: str | None = Field(default=None, max_length=256)
 
 
 def saved_provider_routing(model: str) -> dict:
@@ -238,10 +239,15 @@ def list_goals(project_id: str):
 def create_goal(project_id: str, payload: CreateGoal, subject: str = Depends(get_current_subject)):
     project_folder(project_id)
     saved_provider_routing(payload.model)
-    goal_id, thread_id = "goal-" + uuid.uuid4().hex, uuid.uuid4().hex
+    goal_id, thread_id = "goal-" + uuid.uuid4().hex, payload.threadId or uuid.uuid4().hex
     now = time.time()
-    history.upsert_chat_thread({"id": thread_id, "title": "Goal: " + payload.objective[:100], "modelType": "model1",
-                               "modelId": payload.model, "projectId": project_id, "createdAt": int(now*1000), "updatedAt": int(now*1000)})
+    if payload.threadId:
+        thread = history.get_chat_thread(payload.threadId)
+        if not thread or thread.get("projectId") != project_id:
+            raise HTTPException(409, "The selected chat must belong to this project")
+    else:
+        history.upsert_chat_thread({"id": thread_id, "title": "Goal: " + payload.objective[:100], "modelType": "model1",
+                                   "modelId": payload.model, "projectId": project_id, "createdAt": int(now*1000), "updatedAt": int(now*1000)})
     with closing(goal_connection()) as conn:
         conn.execute("""INSERT INTO custom_goals
           (id,project_id,thread_id,subject,objective,model,status,max_turns,max_seconds,tokens_per_turn,created_at,updated_at)
@@ -328,6 +334,10 @@ async def tick_goal(goal: dict, app, seconds: float):
         update_goal(goal["id"], status="stopped", error="Project or goal chat was deleted")
         cancel_goal_run(goal, app)
         return
+    if not goal["run_id"]:
+        from state import active_generations
+        if goal["thread_id"] in active_generations.active_thread_ids() or runs.list_active(goal["thread_id"]):
+            return
     if goal["run_id"]:
         run = runs.get_run(goal["run_id"])
         if run and run["status"] in runs.ACTIVE_STATUSES:
@@ -353,7 +363,7 @@ async def tick_goal(goal: dict, app, seconds: float):
     )
     replay = [{"role": "system", "content": system}]
     replay.extend({"role": m["role"], "content": message_text(m)} for m in messages if m["role"] in {"user", "assistant"})
-    prompt = goal["objective"] if not messages else "Continue toward the saved goal from the recorded progress."
+    prompt = goal["objective"] if goal["turns"] == 0 else "Continue toward the saved goal from the recorded progress."
     replay.append({"role": "user", "content": prompt})
     run_id, user_id, assistant_id = uuid.uuid4().hex, uuid.uuid4().hex, uuid.uuid4().hex
     payload = CreateChatGenerationRun(runId=run_id, threadId=goal["thread_id"], userMessageId=user_id,

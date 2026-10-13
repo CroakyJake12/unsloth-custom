@@ -88,7 +88,7 @@ def check_health(port, timeout=90):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=3) as response:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=3) as response:
                 if response.status == 200:
                     return
         except (urllib.error.URLError, TimeoutError, ConnectionError):
