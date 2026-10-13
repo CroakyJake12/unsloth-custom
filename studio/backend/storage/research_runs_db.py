@@ -112,6 +112,30 @@ def append_event(run_id: str, event_type: str, data: dict[str, Any]) -> int:
         conn.close()
 
 
+def add_steering(run_id: str, instruction: str) -> dict:
+    """Durably append authenticated user direction without cancelling gathered evidence."""
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT status, config_json FROM research_runs WHERE id=?", (run_id,)).fetchone()
+        if row is None:
+            raise KeyError(run_id)
+        if row["status"] in TERMINAL_STATUSES or row["status"] == "cancelling":
+            raise ResearchConflictError("Research is already stopping or finished")
+        config = _loads(row["config_json"], {})
+        config.setdefault("steeringInstructions", []).append({"text": instruction, "createdAt": now_ms()})
+        conn.execute("UPDATE research_runs SET config_json=?, updated_at=? WHERE id=?",
+                     (json.dumps(config, ensure_ascii=False), now_ms(), run_id))
+        seq = _event_locked(conn, run_id, "run.steered", {"message": "User steering instruction saved", "instruction": instruction})
+        _commit_event(conn)
+        return {"accepted": True, "sequence": seq}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def append_worker_event(
     run_id: str, worker_id: str, event_type: str, data: dict[str, Any]
 ) -> int | None:

@@ -2,6 +2,7 @@
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
 import { useRef, useState } from "react";
+import { ProjectToolsPanel } from "./project-tools-panel";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -194,7 +195,7 @@ export function EditProjectDialog({
       }}
     >
       <DialogContent
-        className="corner-squircle dialog-soft-surface gap-5 sm:max-w-lg"
+        className="corner-squircle dialog-soft-surface max-h-[90vh] overflow-y-auto gap-5 sm:max-w-2xl"
         {...nameImeHandlers}
         // Enter saves from the name field, which a multi-line instructions box cannot do; the
         // chord saves from either. The menus and confirmations inside portal out of here, so
@@ -279,6 +280,7 @@ export function EditProjectDialog({
           />
         </div>
         <ProjectWorkingFolder project={project} />
+        <ProjectToolsPanel key={project.id} projectId={project.id} />
         {/* The Sources tab's own manager, so a folder linked here is linked there. */}
         <div className="flex flex-col gap-1.5">
           <h3 className="text-ui-15 font-medium text-foreground">

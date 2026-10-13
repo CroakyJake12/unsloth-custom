@@ -2553,6 +2553,7 @@ class ResearchSupervisor:
         )
         for position in range(start_position, max_steps):
             await self._check_active(run["id"])
+            await _refresh_user_steering(run)
             source_catalog = "\n".join(
                 f"- {_citation_title(source, source['url'])} | {source['url']} | "
                 f"{source.get('snippet') or ''}"
@@ -2932,6 +2933,7 @@ class ResearchSupervisor:
             _SYNTHESIS_CONTEXT_RESERVE_TOKENS, _run_inference_request(run)
         )
         plan_json = json.dumps(run["plan"], ensure_ascii = False)
+        await _refresh_user_steering(run)
         audit_system = _system_prompt_with_instructions(
             _SYNTHESIS_AUDIT_SYSTEM_PROMPT,
             run["config"],
@@ -3013,6 +3015,7 @@ class ResearchSupervisor:
                     break
             except (ValueError, json.JSONDecodeError):
                 continue
+        await _refresh_user_steering(run)
         report_system = _system_prompt_with_instructions(_REPORT_SYSTEM_PROMPT, run["config"])
         report_scaffold_chars = (
             len(report_system)
@@ -3286,3 +3289,16 @@ def retire_account_research(account) -> None:
                 isinstance(key, tuple) and key[0] == account.account_id
             ):
                 event.set()
+
+
+async def _refresh_user_steering(run: dict) -> None:
+    """Reload durable user directions at each model-call boundary."""
+    latest = await asyncio.to_thread(db.get_run, run["id"])
+    if latest is None:
+        return
+    config = dict(latest["config"])
+    steering = config.get("steeringInstructions") or []
+    if steering:
+        additions = "\n\n".join(str(item["text"]) for item in steering)
+        config["instructions"] = (config.get("instructions") or "") + "\n\nCurrent user steering, in order:\n" + additions
+    run["config"] = config

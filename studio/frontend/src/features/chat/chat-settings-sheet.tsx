@@ -1959,25 +1959,11 @@ export function ChatSettingsPanel({
 
 function MaxToolCallsSlider() {
   const maxToolCalls = useChatRuntimeStore((s) => s.maxToolCallsPerMessage);
-  const setMaxToolCalls = useChatRuntimeStore(
-    (s) => s.setMaxToolCallsPerMessage,
-  );
-
-  // Slider range 0-41; 41 maps to 9999 ("Max")
-  const sliderValue = maxToolCalls >= 9999 ? 41 : Math.min(maxToolCalls, 40);
-
-  return (
-    <ParamSlider
-      label="Max Tool Calls Per Message"
-      value={sliderValue}
-      min={0}
-      max={41}
-      step={1}
-      onChange={(v) => setMaxToolCalls(v >= 41 ? 9999 : v)}
-      format={(v) => (v >= 41 ? "Max" : v === 0 ? "Off" : undefined)}
-      info="Cap on tool/function calls the model may invoke within a single response. 0 disables tool use; Max removes the cap."
-    />
-  );
+  const setMaxToolCalls = useChatRuntimeStore((s) => s.setMaxToolCallsPerMessage);
+  return <ParamSlider label="Tool calls" value={maxToolCalls === 0 ? 0 : 1} min={0} max={1} step={1}
+    onChange={(v) => setMaxToolCalls(v === 0 ? 0 : 9999)}
+    format={(v) => v === 0 ? "Off" : "Unlimited"}
+    info="Tool-call count is unlimited when enabled. Pause or stop the response to interrupt it." />;
 }
 
 function ToolCallTimeoutSlider() {

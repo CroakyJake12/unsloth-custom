@@ -917,6 +917,9 @@ async def lifespan(app: FastAPI):
 
     app.state.chat_generation_supervisor = ChatGenerationSupervisor(app)
 
+    from routes.project_tools import start_goals
+    start_goals(app)
+
     # Idle auto-unload loop (no-op unless the OpenAI auto-unload TTL is set).
     from core.inference.llama_keepwarm import idle_unload_loop, sweep_slot_save_dir
 
@@ -986,6 +989,9 @@ async def lifespan(app: FastAPI):
     _api_usage_writer_lease = _acquire_api_usage_writer()
     _api_usage_callback_lease = _api_monitor.acquire_terminal_callback(_enqueue_api_usage)
     yield
+
+    from routes.project_tools import stop_goals
+    await stop_goals(app)
 
     # Remove only this lifespan's callback. A concurrently live sibling keeps both the monitor sink and the
     # shared serialized writer; the final owner drains accepted receipts off the event loop before stopping the
@@ -1798,6 +1804,8 @@ app.include_router(
 app.include_router(training_router, prefix = "/api/train", tags = ["training"])
 app.include_router(models_router, prefix = "/api/models", tags = ["models"])
 app.include_router(chat_history_router, prefix = "/api/chat", tags = ["chat"])
+from routes.project_tools import router as project_tools_router
+app.include_router(project_tools_router, prefix = "/api/project-tools", tags = ["project-tools"])
 app.include_router(research_runs_router, prefix = "/api/chat/research-runs", tags = ["research-runs"])
 app.include_router(
     chat_generation_runs_router,

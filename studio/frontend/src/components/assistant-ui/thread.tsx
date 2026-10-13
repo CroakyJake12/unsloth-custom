@@ -190,6 +190,7 @@ import {
   useLibraryChatHandoffStore,
 } from "@/features/library/chat-handoff-store";
 import { resumesThought } from "@/features/model-picker";
+import { projectToolsRequest } from "@/features/chat/components/project-tools-panel";
 import { cancelResearchRun } from "@/features/chat/api/research-api";
 import {
   ingestResearchUpdate,
@@ -1409,11 +1410,20 @@ function steerPromptQueueItem(itemId: string) {
   ) {
     return false;
   }
-  if (item.target.researchStarted()) {
-    toast.info("Research is still running", {
-      description: "Stop research before steering with a queued prompt.",
-    });
-    return false;
+  const researchState = useResearchRunStore.getState();
+  const activeResearch = getPromptQueueTargetIds(item.target)
+    .map(id => researchState.sessions[researchState.latestRunByThreadId[id]]?.run)
+    .find(research => research && !["completed", "failed", "cancelled", "cancelling"].includes(research.status));
+  if (activeResearch) {
+    if (!item.prompt.trim()) return false;
+    void projectToolsRequest(`/research/${encodeURIComponent(activeResearch.id)}/steer`, { instruction: item.prompt })
+      .then(() => {
+        const current = findPromptQueueRunByItemId(itemId);
+        if (current && !current.item.dispatched) current.run.items.splice(current.itemIndex, 1);
+        syncPromptQueueUI();
+        toast.success("Queued prompt sent as research steering");
+      }).catch(error => toast.error(error instanceof Error ? error.message : String(error)));
+    return true;
   }
   // move the item so its captured settings and identity stay intact.
   run.items.splice(itemIndex, 1);
@@ -5220,7 +5230,7 @@ const Composer: FC<{
       hasMaterializingImageAttachments ||
       hasMaterializingAudioAttachments ||
       hasMaterializingVideoAttachments,
-    researchActive: isResearchActive,
+    researchActive: false,
     runActive: threadIsRunning || promptQueueActive,
     queueDisabled: Boolean(disableQueue),
     hasOverlay: Boolean(overlay),
@@ -5378,6 +5388,18 @@ const Composer: FC<{
       pendingFollowUpBehaviorRef.current = behavior;
       if (isResearchActive) {
         event.preventDefault();
+        const draft = aui.composer().getState();
+        if (!liveResearchRunId || !draft.text.trim()) return;
+        if (draft.attachments.length) {
+          toast.error("Research steering currently accepts text; keep attachments for a follow-up.");
+          return;
+        }
+        const instruction = draft.text;
+        void projectToolsRequest(`/research/${encodeURIComponent(liveResearchRunId)}/steer`, { instruction })
+          .then(() => {
+            if (aui.composer().getState().text === instruction) aui.composer().setText("");
+            toast.success("Research direction saved for the next step");
+          }).catch(error => toast.error(error instanceof Error ? error.message : String(error)));
         return;
       }
       // A command, not a prompt: ahead of the model and queue gates, so it works with no model loaded.
@@ -7407,6 +7429,7 @@ const ComposerRightControls: FC<{
   const activeResearchRunId = useResearchRunStore((state) =>
     activeThreadId ? state.latestRunByThreadId[activeThreadId] : undefined,
   );
+  const researchSteerText = useAuiState(({ composer }) => composer.text);
   const activeResearchRunStatus = useResearchRunStore((state) => {
     const runId = activeThreadId
       ? state.latestRunByThreadId[activeThreadId]
@@ -7572,6 +7595,7 @@ const ComposerRightControls: FC<{
           )}
         </AuiIf>
       ) : null}
+      {isResearchActive && <Button type="submit" variant="outline" size="sm" disabled={!researchSteerText.trim()}>Steer research</Button>}
       {isResearchActive ? (
         <Button
           type="button"

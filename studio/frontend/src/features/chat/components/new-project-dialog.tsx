@@ -26,6 +26,7 @@ import { toast } from "@/lib/toast";
 import { Folder02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
+import { projectToolsRequest } from "./project-tools-panel";
 import { createChatProject } from "../hooks/use-chat-projects";
 import { useChatRuntimeStore } from "../stores/chat-runtime-store";
 import type { ProjectRecord } from "../types";
@@ -60,6 +61,7 @@ export function NewProjectDialog({
 }) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
+  const [repositoryUrl, setRepositoryUrl] = useState("");
   const [staged, setStaged] = useState<StagedSource[]>([]);
   const [folders, setFolders] = useState<StagedFolder[]>([]);
   const [busy, setBusy] = useState(false);
@@ -91,6 +93,7 @@ export function NewProjectDialog({
 
   function reset() {
     setName("");
+    setRepositoryUrl("");
     setStaged([]);
     setFolders([]);
     setStagingDrop(false);
@@ -114,6 +117,7 @@ export function NewProjectDialog({
     const origin = currentRoute();
     try {
       const project = await createChatProject(trimmed);
+      if (repositoryUrl.trim()) await projectToolsRequest(`/projects/${encodeURIComponent(project.id)}/github`, { url: repositoryUrl.trim(), indexSources: true });
       // Upload before closing so the Sources panel lists them on first fetch.
       // Folders first: their leases expire in minutes, and uploads can be slow.
       await linkStagedFolders(project.id, folders);
@@ -189,6 +193,7 @@ export function NewProjectDialog({
             className="min-w-0 flex-1 bg-transparent py-4 pr-4 pl-2.5 text-base outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
           />
         </div>
+        <input aria-label="GitHub repository (optional)" className="rounded-xl border border-border bg-background p-3 text-sm" placeholder="GitHub repository URL (optional)" value={repositoryUrl} onChange={e => setRepositoryUrl(e.target.value)} disabled={busy} />
         <ProjectSourceDropzone
           staged={staged}
           onChange={setStaged}

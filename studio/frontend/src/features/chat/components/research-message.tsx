@@ -7,6 +7,7 @@ import {
   SourcesGroup,
 } from "@/components/assistant-ui/sources";
 import { MarkdownPreview } from "@/components/markdown/markdown-preview";
+import { ResearchSteering } from "./research-steering";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
@@ -197,6 +198,7 @@ export function ResearchMessage(): ReactElement | null {
           </Button>
         </div>
       </div>
+      {!failed && !cancelled && <ResearchSteering runId={run.id} />}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
+import { ProjectToolsPanel } from "@/features/chat/components/project-tools-panel";
 import { Button } from "@/components/ui/button";
 import { useNativeFileDrop } from "@/features/native-intents";
 import type { NativeIntent } from "@/features/native-intents";
@@ -185,7 +186,8 @@ export function ProjectSourcesPanel({ projectId }: { projectId: string }) {
   );
 
   return (
-    <div className="mt-8" ref={dropRef} {...dragHandlers}>
+    <div className="mt-8 space-y-4" ref={dropRef} {...dragHandlers}>
+      <ProjectToolsPanel key={projectId} projectId={projectId} />
       <input
         ref={fileInputRef}
         type="file"

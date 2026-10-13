@@ -3,7 +3,7 @@
 
 // Browser folder drops and picks, flattened to files (the desktop links folders instead).
 
-export const MAX_FOLDER_FILES = 2000;
+export const MAX_FOLDER_FILES = Number.POSITIVE_INFINITY;
 
 const SKIPPED_DIRS = new Set([
   "node_modules",
@@ -126,7 +126,7 @@ export function filesFromFolderInput(
       keep(file.name)
     );
   });
-  const files = all.slice(0, MAX_FOLDER_FILES);
+  const files = all;
   return { files, truncated: all.length - files.length, hadFolder: true };
 }
 

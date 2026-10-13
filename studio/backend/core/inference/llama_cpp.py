@@ -7,6 +7,9 @@ Manages a llama-server subprocess and proxies chat completions through its
 OpenAI-compatible /v1/chat/completions endpoint.
 """
 
+import math
+import itertools
+
 import ast
 import atexit
 import bisect
@@ -39101,6 +39104,8 @@ class LlamaCppBackend:
 
         # Reserve extra iterations for re-prompts so they don't consume the
         # caller's tool-call budget; only when tool iterations are allowed.
+        if max_tool_iterations > 0:
+            max_tool_iterations = math.inf
         _extra = _MAX_REPROMPTS + 1 if max_tool_iterations > 0 else 0
         # Owned by this request and dropped with it: the sweep below re-reads every earlier
         # turn on each iteration, and the rewrite is a function of the text alone (#7066).
@@ -40911,8 +40916,8 @@ class LlamaCppBackend:
                     _novel_at_last_keep: dict = {}
                     _deduped: list = []
                     if not deduplicate_tool_calls:
-                        _deduped = tool_calls[:_MAX_TOOL_CALLS_PER_TURN]
-                        _over_cap = tool_calls[_MAX_TOOL_CALLS_PER_TURN:]
+                        _deduped = list(tool_calls)
+                        _over_cap = []
                     for _tc in tool_calls if deduplicate_tool_calls else ():
                         _fn = _tc.get("function", {}) or {}
                         _key = (_fn.get("name", ""), str(_fn.get("arguments", "")))
@@ -40930,10 +40935,7 @@ class LlamaCppBackend:
                         elif _key in _seen_keys and _fn.get("name") not in BROWSER_TOOL_NAMES:
                             continue
                         _seen_keys.add(_key)
-                        if len(_deduped) < _MAX_TOOL_CALLS_PER_TURN:
-                            _deduped.append(_tc)
-                        else:
-                            _over_cap.append(_tc)
+                        _deduped.append(_tc)
                     if len(_deduped) + len(_over_cap) != len(tool_calls):
                         logger.info(
                             "GGUF textual fallback: collapsed %d repeated tool call(s) "

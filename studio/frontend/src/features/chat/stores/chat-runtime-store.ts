@@ -4303,7 +4303,7 @@ export const useChatRuntimeStore = create<ChatRuntimeStore>((set, get) => ({
   nudgeToolCalls: true,
   deduplicateToolCalls: true,
   autoCompactEnabled: DEFAULT_AUTO_COMPACT_ENABLED,
-  maxToolCallsPerMessage: 25,
+  maxToolCallsPerMessage: 9999,
   toolCallTimeout: 5,
   kvCacheDtype: null,
   mlxKvQuant: null,

@@ -11,6 +11,9 @@ native transformers has no such channel, so this loop parses tool calls from the
 dispatches via ``core.inference.tools``.
 """
 
+import math
+import itertools
+
 import bisect
 import inspect
 import json
@@ -809,6 +812,9 @@ def run_safetensors_tool_loop(
             for record in tool_controller.history
         )
 
+    if max_tool_iterations > 0:
+        max_tool_iterations = math.inf
+
     if max_tool_iterations <= 0:
         # 0 = disabled (same contract as the GGUF loop).
         yield {"type": "status", "text": ""}
@@ -824,7 +830,7 @@ def run_safetensors_tool_loop(
         if max_tool_iterations > 0
         else 0
     )
-    for iteration in range(max_tool_iterations + _extra_iters + 1):
+    for iteration in (itertools.count() if math.isinf(max_tool_iterations) else range(max_tool_iterations + _extra_iters + 1)):
         if cancel_event is not None and cancel_event.is_set():
             return
         # Whether this turn ran a tool; a no-op-only turn stays False and doesn't consume budget.
@@ -1448,8 +1454,8 @@ def run_safetensors_tool_loop(
             novel_at_last_keep: dict = {}
             deduped: list = []
             if not deduplicate_tool_calls:
-                deduped = tool_calls[:_MAX_TOOL_CALLS_PER_TURN]
-                over_cap = tool_calls[_MAX_TOOL_CALLS_PER_TURN:]
+                deduped = list(tool_calls)
+                over_cap = []
             for _tc in tool_calls if deduplicate_tool_calls else ():
                 _fn = _tc.get("function", {}) or {}
                 _key = (_fn.get("name", ""), str(_fn.get("arguments", "")))
@@ -1467,10 +1473,7 @@ def run_safetensors_tool_loop(
                 elif _key in seen_keys and _fn.get("name") not in BROWSER_TOOL_NAMES:
                     continue
                 seen_keys.add(_key)
-                if len(deduped) < _MAX_TOOL_CALLS_PER_TURN:
-                    deduped.append(_tc)
-                else:
-                    over_cap.append(_tc)
+                deduped.append(_tc)
             if len(deduped) + len(over_cap) != len(tool_calls):
                 logger.info(
                     "Safetensors: collapsed %d repeated tool call(s) in one turn to %d",

@@ -1420,7 +1420,7 @@ async def stream_with_studio_tools(
     # preserve the request branch for tools that search conversation history.
     request_branch = list(restored)
     remaining = policy.max_calls
-    unlimited = remaining >= 9999
+    unlimited = remaining > 0
     session_id = run.session_id
     thread_id = run.thread_id
     tools = policy.tools
